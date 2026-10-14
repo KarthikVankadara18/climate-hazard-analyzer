@@ -1,7 +1,15 @@
+import asyncio
 from datetime import date, timedelta
+
+from pymongo import UpdateOne
+from pymongo.errors import BulkWriteError
 
 from app.database import weather_collection
 from app.services.weatherservice import fetch_historical_weather
+
+COORDINATE_DECIMALS = 2
+
+_location_locks: dict[tuple[float, float], asyncio.Lock] = {}
 
 async def fetch_weather_with_cache(
     latitude: float,
@@ -14,6 +22,21 @@ async def fetch_weather_with_cache(
             "Start date must be before or equal to end date."
         )
 
+    latitude = round(latitude, COORDINATE_DECIMALS)
+    longitude = round(longitude, COORDINATE_DECIMALS)
+    lock = _location_locks.setdefault((latitude, longitude), asyncio.Lock())
+
+    async with lock:
+        return await _fetch_weather_locked(
+            latitude, longitude, start_date, end_date
+        )
+
+async def _fetch_weather_locked(
+    latitude: float,
+    longitude: float,
+    start_date: date,
+    end_date: date,
+):
     cursor = weather_collection.find(
         {
             "latitude": latitude,
@@ -63,6 +86,8 @@ async def fetch_weather_with_cache(
             end_date=range_end,
         )
 
+        operations = []
+
         for record in fresh_records:
             document = {
                 "latitude": latitude,
@@ -71,17 +96,31 @@ async def fetch_weather_with_cache(
                 "temperature_max": record["temperature_max"],
             }
 
-            await weather_collection.update_one(
-                {
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "date": record["date"],
-                },
-                {"$set": document},
-                upsert=True,
+            operations.append(
+                UpdateOne(
+                    {
+                        "latitude": latitude,
+                        "longitude": longitude,
+                        "date": record["date"],
+                    },
+                    {"$set": document},
+                    upsert=True,
+                )
             )
 
             records_by_date[record["date"]] = document
+
+        # One batched round trip instead of one per day.
+        if operations:
+            try:
+                await weather_collection.bulk_write(
+                    operations, ordered=False
+                )
+            except BulkWriteError as exc:
+
+                errors = exc.details.get("writeErrors", [])
+                if any(e.get("code") != 11000 for e in errors):
+                    raise
 
     results = []
     current_date = start_date

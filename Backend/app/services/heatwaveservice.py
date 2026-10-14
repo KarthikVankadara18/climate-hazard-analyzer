@@ -69,7 +69,6 @@ def calculate_seasonal_thresholds(
 
             distance = abs((candidate - target).days)
 
-            # Handle windows crossing the year boundary.
             distance = min(distance, 366 - distance)
 
             if distance <= window_days:
@@ -252,29 +251,28 @@ def check_baseline_quality(
     )
 
     reference_year = 2000
+    per_day = np.zeros(366, dtype=np.int64)
+    for record_date, _ in valid_temperatures:
+        ordinal = (
+            date(reference_year, record_date.month, record_date.day)
+            - date(reference_year, 1, 1)
+        ).days
+        per_day[ordinal] += 1
+
     sample_counts = {}
+    indices = np.arange(366)
 
     for day_number in range(366):
         target = date(reference_year, 1, 1) + timedelta(
             days=day_number
         )
-        count = 0
-
-        for record_date, _ in valid_temperatures:
-            candidate = date(
-                reference_year,
-                record_date.month,
-                record_date.day,
-            )
-            distance = abs((candidate - target).days)
-            distance = min(distance, 366 - distance)
-
-            if distance <= window_days:
-                count += 1
-
         key = target.strftime("%m-%d")
         if key in seasonal_thresholds:
-            sample_counts[key] = count
+            distance = np.abs(indices - day_number)
+            distance = np.minimum(distance, 366 - distance)
+            sample_counts[key] = int(
+                per_day[distance <= window_days].sum()
+            )
 
     counts = list(sample_counts.values())
 

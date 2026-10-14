@@ -154,10 +154,11 @@ async def analyze_area_point(
         )
     
     stage_started = perf_counter()
-    thresholds = calculate_seasonal_thresholds(
+    thresholds = await asyncio.to_thread(
+        calculate_seasonal_thresholds,
         baseline_records,
-        percentile=95,
-        window_days=15,
+        95,
+        15,
     )
     logger.info(
         "AREA_POINT_STAGE point=%s stage=thresholds seconds=%.2f count=%d",
@@ -165,10 +166,11 @@ async def analyze_area_point(
     )
 
     stage_started = perf_counter()
-    baseline_quality = check_baseline_quality(
+    baseline_quality = await asyncio.to_thread(
+        check_baseline_quality,
         baseline_records,
         thresholds,
-        window_days=15,
+        15,
     )
     logger.info(
         "AREA_POINT_STAGE point=%s stage=baseline_quality seconds=%.2f",
@@ -299,16 +301,18 @@ async def analyze_heatwaves(
                 ),
             )
 
-        seasonal_thresholds = calculate_seasonal_thresholds(
+        seasonal_thresholds = await asyncio.to_thread(
+            calculate_seasonal_thresholds,
             baseline_records,
-            percentile=95,
-            window_days=15,
+            95,
+            15,
         )
 
-        baseline_quality = check_baseline_quality(
+        baseline_quality = await asyncio.to_thread(
+            check_baseline_quality,
             baseline_records,
             seasonal_thresholds,
-            window_days=15,
+            15,
         )
 
         analysis_records = await fetch_weather_with_cache(

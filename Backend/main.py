@@ -1,5 +1,6 @@
 import uvicorn
 import os
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,6 +17,11 @@ from app.database import (
 from app.limiter import limiter
 from app.routes.weather import router as weather_router
 from app.routes.analysis import router as analysis_router
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
