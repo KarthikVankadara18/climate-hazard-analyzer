@@ -59,6 +59,56 @@ export interface HeatwaveDataQuality {
   qualifying_dates_outside_events: string[];
 }
 
+export interface TrendAnnualRow {
+  year: number;
+  events: number;
+  heatwave_days: number;
+  longest_event_days: number;
+  coverage: number;
+  valid: boolean;
+  partial_year: boolean;
+  heatwave_days_rolling_3yr: number | null;
+}
+
+export interface MannKendallResult {
+  s: number;
+  z: number;
+  p_value: number;
+  tau: number;
+  significant: boolean;
+  direction: "increasing" | "decreasing" | "none";
+}
+
+export interface MetricTrend {
+  linear_regression: {
+    slope_per_year: number;
+    slope_per_decade: number;
+    intercept: number;
+    r_squared: number;
+  } | null;
+  mann_kendall: MannKendallResult | null;
+  sens_slope_per_year: number | null;
+  period_change: {
+    first_period: [number, number];
+    second_period: [number, number];
+    first_mean_per_year: number;
+    second_mean_per_year: number;
+    percent_change: number | null;
+  } | null;
+}
+
+export interface TrendSummary {
+  annual: TrendAnnualRow[];
+  metrics: { events: MetricTrend; heatwave_days: MetricTrend };
+  insight: { level: "significant" | "not_significant" | "insufficient"; text: string };
+  parameters: {
+    min_year_coverage: number;
+    min_years_for_trend: number;
+    significance_level: number;
+    rolling_window_years: number;
+  };
+}
+
 export interface HeatwaveResponse {
   location: {
     latitude: number;
@@ -83,6 +133,7 @@ export interface HeatwaveResponse {
     longest_event: HeatwaveEvent | null;
   };
   events: HeatwaveEvent[];
+  trends?: TrendSummary;
   data_quality: HeatwaveDataQuality;
 }
 

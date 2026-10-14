@@ -16,6 +16,7 @@ from app.services.heatwaveservice import (
     check_baseline_quality,
 )
 
+from app.services.trendservice import compute_trends
 from app.limiter import limiter
 logger = logging.getLogger(__name__)
 
@@ -428,6 +429,14 @@ async def analyze_heatwaves(
 
         )
 
+        trends = await asyncio.to_thread(
+            compute_trends,
+            events,
+            analysis_records,
+            start_date,
+            end_date,
+        )
+
         longest_event = max(
 
             events,
@@ -489,6 +498,8 @@ async def analyze_heatwaves(
             },
 
             "events": events,
+
+            "trends": trends,
 
             "data_quality": {
 

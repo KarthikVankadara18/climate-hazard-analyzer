@@ -69,6 +69,7 @@ def calculate_seasonal_thresholds(
 
             distance = abs((candidate - target).days)
 
+            # Handle windows crossing the year boundary.
             distance = min(distance, 366 - distance)
 
             if distance <= window_days:
@@ -250,6 +251,8 @@ def check_baseline_quality(
         count - 1 for count in date_counts.values() if count > 1
     )
 
+    # Vectorised: count valid samples per calendar day (leap-year
+    # ordinal 0..365), then sum counts inside each circular window.
     reference_year = 2000
     per_day = np.zeros(366, dtype=np.int64)
     for record_date, _ in valid_temperatures:

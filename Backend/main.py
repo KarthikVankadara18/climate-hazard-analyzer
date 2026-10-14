@@ -18,6 +18,7 @@ from app.limiter import limiter
 from app.routes.weather import router as weather_router
 from app.routes.analysis import router as analysis_router
 
+# Without this, the app's logger.info() calls are silently dropped on Render.
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",

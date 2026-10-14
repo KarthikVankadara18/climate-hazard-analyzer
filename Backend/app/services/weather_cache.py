@@ -7,9 +7,15 @@ from pymongo.errors import BulkWriteError
 from app.database import weather_collection
 from app.services.weatherservice import fetch_historical_weather
 
+# Open-Meteo's archive grid is coarser than 0.01 degrees (~1 km), so snapping
+# map clicks to 2 decimals returns the same data but lets nearby clicks share
+# one cache entry instead of triggering a fresh 30-year download every time.
 COORDINATE_DECIMALS = 2
 
+# One fill at a time per location, so concurrent requests for the same point
+# (the Analysis page fires two) don't download and upsert the same data twice.
 _location_locks: dict[tuple[float, float], asyncio.Lock] = {}
+
 
 async def fetch_weather_with_cache(
     latitude: float,
@@ -30,6 +36,7 @@ async def fetch_weather_with_cache(
         return await _fetch_weather_locked(
             latitude, longitude, start_date, end_date
         )
+
 
 async def _fetch_weather_locked(
     latitude: float,
@@ -117,7 +124,8 @@ async def _fetch_weather_locked(
                     operations, ordered=False
                 )
             except BulkWriteError as exc:
-
+                # Duplicate-key errors just mean another worker cached the
+                # same day first; anything else is a real failure.
                 errors = exc.details.get("writeErrors", [])
                 if any(e.get("code") != 11000 for e in errors):
                     raise

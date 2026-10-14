@@ -42,6 +42,11 @@ import type { HeatwaveEvent, WeatherRecord } from "../services/climateApi";
 
 import RegionAutocomplete, { type LocationResult } from "../components/common/RegionAutocomplete";
 
+const YEAR_OPTIONS = Array.from(
+  { length: new Date().getFullYear() - 1950 + 1 },
+  (_, i) => String(1950 + i),
+);
+
 const cardClass = "rounded-2xl border border-[#E1E8E4] bg-white";
 
 const tabs = [
@@ -256,7 +261,7 @@ export default function Analysis() {
   const [activeTab, setActiveTab] = useState<TabId>("frequency");
   const [region, setRegion] = useState("Hyderabad");
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
-  const [period, setPeriod] = useState("2018–2020");
+  const [period, setPeriod] = useState("2005–2020");
   const [analysisResult, setAnalysisResult] = useState<HeatwaveResponse | null>(null);
   const [weatherResult, setWeatherResult] = useState<HistoricalWeatherResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -287,7 +292,7 @@ export default function Analysis() {
       startYear >= endYear ||
       endYear > new Date().getFullYear()
     ) {
-      setError("Please select a valid analysis period.");
+      setError("Please select a valid period: the start year must be earlier than the end year.");
       return;
     }
     const today = new Date();
@@ -426,19 +431,32 @@ export default function Analysis() {
               placeholder="Search for a city"
             />
           </div>
-          <label className="block">
-            <span className="text-xs font-medium text-[#647570]">Time period</span>
-            <select
-              value={period}
-              onChange={(event) => setPeriod(event.target.value)}
-              className="mt-2 w-full rounded-lg border border-[#DCE5E0] bg-white px-3 py-2.5 text-sm text-[#18332F] outline-none focus:border-[#D97745]"
-            >
-              <option value="2018–2020">2018–2020</option>
-              <option value="2015–2020">2015–2020</option>
-              <option value="2005–2014">2005–2014</option>
-              <option value="1995–2004">1995–2004</option>
-            </select>
-          </label>
+          <div className="block">
+            <span className="text-xs font-medium text-[#647570]">Time period (start – end year)</span>
+            <div className="mt-2 flex items-center gap-2">
+              {[0, 1].map((index) => {
+                const [currentStart, currentEnd] = period.split(/[–-]/);
+                const value = index === 0 ? currentStart : currentEnd;
+                return (
+                  <select
+                    key={index}
+                    aria-label={index === 0 ? "Start year" : "End year"}
+                    value={value}
+                    onChange={(event) =>
+                      setPeriod(index === 0 ? `${event.target.value}–${currentEnd}` : `${currentStart}–${event.target.value}`)
+                    }
+                    className="w-full rounded-lg border border-[#DCE5E0] bg-white px-3 py-2.5 text-sm text-[#18332F] outline-none focus:border-[#D97745]"
+                  >
+                    {YEAR_OPTIONS.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })}
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleAnalyze}
@@ -465,6 +483,20 @@ export default function Analysis() {
           <p className="text-xs text-[#82918A]">Retrieving historical weather and calculating heatwave events...</p>
         )}
       </section>
+      {analysisResult?.trends && (
+        <section
+          role="note"
+          aria-label="Summary insight"
+          className={`rounded-2xl border p-4 sm:p-5 ${
+            analysisResult.trends.insight.level === "significant"
+              ? "border-[#F0C9B0] bg-[#FFF6EF]"
+              : "border-[#DCE5E0] bg-[#FAFCFB]"
+          }`}
+        >
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#B85C24]">Summary insight</p>
+          <p className="mt-2 text-sm leading-6 text-[#18332F]">{analysisResult.trends.insight.text}</p>
+        </section>
+      )}
 <div className="overflow-x-auto border-b border-[#DCE5E0]">
         <div className="flex min-w-max gap-1">
           {tabs.map((tab) => {
@@ -775,10 +807,15 @@ export default function Analysis() {
             <section className={`${cardClass} p-5`}>
               <div className="flex items-center gap-2">
                 <CalendarDays size={18} className="text-[#367CCB]" />
-                <h3 className="text-sm font-semibold text-[#18332F]">Period comparison</h3>
+                <h3 className="text-sm font-semibold text-[#18332F]">Statistical significance (Mann-Kendall)</h3>
               </div>
               <p className="mt-3 text-sm leading-6 text-[#71817A]">
-                The regression uses annual event counts and heatwave-day totals from the selected period. Years with no valid weather observations are excluded. The current-year result may represent a partial year, and this simple linear model does not establish causation or statistical significance.
+                {(() => {
+                  const metric = analysisResult?.trends?.metrics.heatwave_days;
+                  const mk = metric?.mann_kendall;
+                  if (!metric || !mk) return "A Mann-Kendall test needs at least four years with valid data.";
+                  return `Mann-Kendall test on annual heatwave days: ${mk.direction} (τ = ${mk.tau.toFixed(2)}, p = ${mk.p_value.toFixed(3)}, ${mk.significant ? "significant" : "not significant"} at α = ${analysisResult?.trends?.parameters.significance_level}). Sen's slope: ${metric.sens_slope_per_year ?? "—"} days/year. Years with under ${Math.round((analysisResult?.trends?.parameters.min_year_coverage ?? 0.9) * 100)}% valid data are excluded. A partial current year can bias results.`;
+                })()}
               </p>
             </section>
           </div>

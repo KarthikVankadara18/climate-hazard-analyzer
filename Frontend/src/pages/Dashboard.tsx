@@ -685,8 +685,9 @@ export default function Dashboard() {
             <h2 className="text-base font-semibold text-[#18332F]">Key insights</h2>
 
             <p className="mt-1 text-sm leading-6 text-[#71817A]">
-              Findings will be generated from the observed data, with the comparison period, coverage and statistical
-              method shown alongside each conclusion.
+              {analysisResult?.trends
+                ? analysisResult.trends.insight.text
+                : "Run an analysis to generate findings from the observed data, with the comparison period, coverage and statistical method shown alongside each conclusion."}
             </p>
           </div>
         </div>
